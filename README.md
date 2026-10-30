@@ -1,6 +1,6 @@
 # FlashForge WebUI (Docker)
 
-Run the prebuilt FlashForge WebUI Linux x64 release binary in Docker. The Docker build downloads the binary directly from the GitHub release; it does not build the application from source.
+Run the prebuilt FlashForge WebUI Linux x64 release binary in Docker. The Docker build downloads the binary directly from the GitHub release; it does not build the application from source. The upstream source repository is [Parallel-7/FlashForgeWebUI](https://github.com/Parallel-7/FlashForgeWebUI).
 
 ## Requirements
 
