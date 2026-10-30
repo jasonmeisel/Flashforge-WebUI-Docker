@@ -1,0 +1,85 @@
+name: Publish FlashForge WebUI image
+
+on:
+  # Watches the upstream repo's releases; the default branch itself need not be
+  # updated or receive a commit for this workflow to run.
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this Docker wrapper repository
+        uses: actions/checkout@v4
+
+      - name: Find latest upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_json="$(gh api repos/Parallel-7/FlashForgeWebUI/releases/latest)"
+          tag="$(printf '%s' "$release_json" | jq -r .tag_name)"
+          asset_url="$(printf '%s' "$release_json" | jq -r '.assets[] | select(.name == "flashforge-webui-linux-x64.bin") | .browser_download_url' | head -n 1)"
+          if [ -z "$tag" ] || [ "$tag" = null ] || [ -z "$asset_url" ]; then
+            echo "Could not find latest release tag or Linux x64 binary asset" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "asset_url=$asset_url" >> "$GITHUB_OUTPUT"
+          echo "release_url=https://github.com/Parallel-7/FlashForgeWebUI/releases/download/$tag/flashforge-webui-linux-x64.bin" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if the upstream release is already published
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if gh api "/user/packages/container/${GITHUB_REPOSITORY#*/}/versions" --jq '.[].metadata.container.tags[]?' 2>/dev/null | grep -Fxq "$version"; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.publish == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.check.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image metadata
+        if: steps.check.outputs.publish == 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+          tags: |
+            type=raw,value=${{ steps.upstream.outputs.tag }}
+            type=raw,value=latest
+
+      - name: Build and push image
+        if: steps.check.outputs.publish == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            RELEASE_URL=${{ steps.upstream.outputs.release_url }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
