@@ -10,7 +10,32 @@ Run the prebuilt FlashForge WebUI Linux x64 release binary in Docker. The Docker
 
 ## Start
 
-From this directory, build and start the container:
+### Use the published GHCR image
+
+Create a `compose.yaml` with the following content for this repository's published image:
+
+```yaml
+services:
+  flashforge-webui:
+    image: ghcr.io/jasonmeisel/flashforge-webui-docker:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+```
+
+Then start it:
+
+```sh
+docker compose up -d
+```
+
+If the package is private, first authenticate with `docker login ghcr.io` using a GitHub token that can read packages. The image is published by this repository's workflow after it detects an upstream release.
+
+### Build locally from this repository
+
+Alternatively, clone this repository and build/start the image locally:
 
 ```sh
 docker compose up -d --build
