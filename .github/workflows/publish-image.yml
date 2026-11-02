@@ -43,8 +43,7 @@ jobs:
           TAG: ${{ steps.upstream.outputs.tag }}
         run: |
           set -euo pipefail
-          version="${TAG#v}"
-          if gh api "/user/packages/container/${GITHUB_REPOSITORY#*/}/versions" --jq '.[].metadata.container.tags[]?' 2>/dev/null | grep -Fxq "$version"; then
+          if gh api "/user/packages/container/${GITHUB_REPOSITORY#*/}/versions" --jq '.[].metadata.container.tags[]?' 2>/dev/null | grep -Fxq "$TAG"; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
